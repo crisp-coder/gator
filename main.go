@@ -2,7 +2,9 @@ package main
 
 import (
 	"fmt"
+	"os"
 
+	"github.com/crisp-coder/gator/internal/commands"
 	"github.com/crisp-coder/gator/internal/config"
 )
 
@@ -10,17 +12,29 @@ func main() {
 	cfg, err := config.Read()
 	if err != nil {
 		fmt.Println("%w", err)
-		return
+		os.Exit(1)
 	}
-	err = cfg.SetUser("crisp-coder")
+	state := commands.State{
+		Cfg: &cfg,
+	}
+
+	cmds := commands.MakeCommands()
+
+	args := os.Args
+	if len(args) < 2 {
+		fmt.Println("missing command name")
+		os.Exit(1)
+	}
+	cmd_name := args[1]
+	cmd_args := args[2:]
+
+	err = cmds.Run(&state, commands.Command{
+		Name: cmd_name,
+		Args: cmd_args,
+	})
+
 	if err != nil {
-		fmt.Println("%w", err)
-		return
+		fmt.Println(err)
+		os.Exit(1)
 	}
-	cfg2, err := config.Read()
-	if err != nil {
-		fmt.Println("%w", err)
-		return
-	}
-	fmt.Printf("DBCONN: %s\nUser: %s\n", cfg2.Db_url, cfg2.Username)
 }
