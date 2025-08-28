@@ -1,20 +1,32 @@
 package main
 
 import (
+	"database/sql"
 	"fmt"
 	"os"
 
 	"github.com/crisp-coder/gator/internal/commands"
 	"github.com/crisp-coder/gator/internal/config"
+	"github.com/crisp-coder/gator/internal/database"
+	_ "github.com/lib/pq"
 )
 
 func main() {
+
 	cfg, err := config.Read()
 	if err != nil {
-		fmt.Println("%w", err)
+		fmt.Println(err)
 		os.Exit(1)
 	}
+
+	db, err := sql.Open("postgres", cfg.Db_url)
+	if err != nil {
+		fmt.Println(err)
+	}
+	dbQueries := database.New(db)
+
 	state := commands.State{
+		Db:  dbQueries,
 		Cfg: &cfg,
 	}
 

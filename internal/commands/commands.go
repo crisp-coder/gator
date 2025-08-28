@@ -17,7 +17,7 @@ func (cmds *Commands) Run(s *State, cmd Command) error {
 	if f, ok := cmds.cmd_map[cmd.Name]; ok {
 		return f(s, cmd)
 	} else {
-		return errors.New("command not found.")
+		return errors.New("command not found")
 	}
 }
 
@@ -31,6 +31,8 @@ func MakeCommands() Commands {
 	}
 
 	cmds.Register("login", handlerLogin)
+	cmds.Register("register", handlerRegister)
+	cmds.Register("reset", handleReset)
 
 	return cmds
 }
