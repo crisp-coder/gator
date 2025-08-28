@@ -33,6 +33,8 @@ func MakeCommands() Commands {
 	cmds.Register("login", handlerLogin)
 	cmds.Register("register", handlerRegister)
 	cmds.Register("reset", handleReset)
+	cmds.Register("users", handleListUsers)
+	cmds.Register("agg", handleAgg)
 
 	return cmds
 }
