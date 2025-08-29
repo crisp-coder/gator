@@ -2,6 +2,7 @@ package commands
 
 import (
 	"errors"
+	"fmt"
 )
 
 type Commands struct {
@@ -15,6 +16,10 @@ type Command struct {
 
 func (cmds *Commands) Run(s *State, cmd Command) error {
 	if f, ok := cmds.cmd_map[cmd.Name]; ok {
+		fmt.Printf("command: %v\n", cmd.Name)
+		for i, arg := range cmd.Args {
+			fmt.Printf("arg[%v]: %v\n", i, arg)
+		}
 		return f(s, cmd)
 	} else {
 		return errors.New("command not found")
