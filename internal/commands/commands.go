@@ -35,6 +35,8 @@ func MakeCommands() Commands {
 	cmds.Register("reset", handleReset)
 	cmds.Register("users", handleListUsers)
 	cmds.Register("agg", handleAgg)
+	cmds.Register("addfeed", handleAddFeed)
+	cmds.Register("feeds", handleListFeeds)
 
 	return cmds
 }

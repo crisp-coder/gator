@@ -21,7 +21,7 @@ func handlerLogin(s *State, cmd Command) error {
 
 	res, err := s.Db.GetUser(context.Background(), cmd.Args[0])
 	if err != nil {
-		return fmt.Errorf("error retrieving user form database: %w", err)
+		return fmt.Errorf("error retrieving user from database: %w", err)
 	}
 
 	err = s.Cfg.SetUser(res.Name)
@@ -41,10 +41,7 @@ func handlerRegister(s *State, cmd Command) error {
 	res, err := s.Db.CreateUser(
 		context.Background(),
 		database.CreateUserParams{
-			ID: uuid.NullUUID{
-				UUID:  uuid.New(),
-				Valid: true,
-			},
+			ID:        uuid.New(),
 			CreatedAt: time.Now(),
 			UpdatedAt: time.Now(),
 			Name:      cmd.Args[0],
@@ -125,5 +122,59 @@ func handleAgg(s *State, cmd Command) error {
 		fmt.Println(indent + html.UnescapeString(item.Description))
 		fmt.Println(indent + html.UnescapeString(item.PubDate))
 	}
+	return nil
+}
+
+func handleAddFeed(s *State, cmd Command) error {
+	if len(cmd.Args) != 2 {
+		return fmt.Errorf("missing arguments to addfeed")
+	}
+
+	userres, err := s.Db.GetUser(context.Background(), s.Cfg.Username)
+	if err != nil {
+		return fmt.Errorf("error retrieving user from database: %w", err)
+	}
+
+	name := cmd.Args[0]
+	url := cmd.Args[1]
+	userId := userres.ID
+
+	feedres, err := s.Db.CreateFeed(
+		context.Background(),
+		database.CreateFeedParams{
+			ID:        uuid.New(),
+			CreatedAt: time.Now(),
+			UpdatedAt: time.Now(),
+			Name:      name,
+			Url:       url,
+			UserID:    userId,
+		})
+	if err != nil {
+		return fmt.Errorf("error creating new feed")
+	}
+
+	fmt.Println(feedres)
+
+	return nil
+}
+
+func handleListFeeds(s *State, cmd Command) error {
+	if len(cmd.Args) != 0 {
+		return fmt.Errorf("too many arguments to feeds")
+	}
+
+	feeds, err := s.Db.ListFeeds(context.Background())
+	if err != nil {
+		return fmt.Errorf("error retrieving feeds: %w", err)
+	}
+
+	for _, feed := range feeds {
+		fmt.Printf("Name: %v\n", feed.Name)
+		fmt.Printf("URL: %v\n", feed.Url)
+		if feed.Username.Valid {
+			fmt.Printf("Username: %v\n", feed.Username.String)
+		}
+	}
+
 	return nil
 }

@@ -19,7 +19,7 @@ RETURNING id, created_at, updated_at, name
 `
 
 type CreateUserParams struct {
-	ID        uuid.NullUUID
+	ID        uuid.UUID
 	CreatedAt time.Time
 	UpdatedAt time.Time
 	Name      string
