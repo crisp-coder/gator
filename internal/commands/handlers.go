@@ -178,3 +178,15 @@ func handleListFeeds(s *State, cmd Command) error {
 
 	return nil
 }
+
+func handleFollow(s *State, cmd Command) error {
+	if len(cmd.Args) != 1 {
+		return fmt.Errorf("missing arguments to follow command")
+	}
+
+	return nil
+}
+
+func handleFollowing(s *State, cmd Command) error {
+	return nil
+}
