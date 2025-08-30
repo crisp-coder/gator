@@ -40,10 +40,11 @@ func MakeCommands() Commands {
 	cmds.Register("reset", handleReset)
 	cmds.Register("users", handleListUsers)
 	cmds.Register("agg", handleAgg)
-	cmds.Register("addfeed", handleAddFeed)
+	cmds.Register("addfeed", middlewareLoggedIn(handleAddFeed))
 	cmds.Register("feeds", handleListFeeds)
-	cmds.Register("follow", handleFollow)
-	cmds.Register("following", handleFollowing)
+	cmds.Register("follow", middlewareLoggedIn(handleFollow))
+	cmds.Register("following", middlewareLoggedIn(handleFollowing))
+	cmds.Register("unfollow", middlewareLoggedIn(handleUnfollow))
 
 	return cmds
 }

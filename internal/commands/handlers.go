@@ -19,17 +19,17 @@ func handlerLogin(s *State, cmd Command) error {
 		return errors.New("missing arguments to login command")
 	}
 
-	res, err := s.Db.GetUserByName(context.Background(), cmd.Args[0])
+	user_res, err := s.Db.GetUserByName(context.Background(), cmd.Args[0])
 	if err != nil {
 		return fmt.Errorf("error retrieving user from database: %w", err)
 	}
 
-	err = s.Cfg.SetUser(res.Name)
+	err = s.Cfg.SetUser(user_res.Name)
 	if err != nil {
 		return fmt.Errorf("error handling login: %w", err)
 	}
 
-	fmt.Printf("User: %v has been set.\n", res.Name)
+	fmt.Printf("User: %v has been set.\n", s.Cfg.Username)
 	return nil
 }
 
@@ -38,7 +38,7 @@ func handlerRegister(s *State, cmd Command) error {
 		return errors.New("missing arguments to register command")
 	}
 
-	res, err := s.Db.CreateUser(
+	user_res, err := s.Db.CreateUser(
 		context.Background(),
 		database.CreateUserParams{
 			ID:        uuid.New(),
@@ -51,12 +51,12 @@ func handlerRegister(s *State, cmd Command) error {
 		return fmt.Errorf("error creating user: %w", err)
 	}
 
-	err = s.Cfg.SetUser(res.Name)
+	err = s.Cfg.SetUser(user_res.Name)
 	if err != nil {
 		return fmt.Errorf("error handling register: %w", err)
 	}
 
-	fmt.Printf("User: %v has been set.\n", res.Name)
+	fmt.Printf("User: %v has been set.\n", s.Cfg.Username)
 
 	return nil
 }
@@ -126,38 +126,29 @@ func handleAgg(s *State, cmd Command) error {
 	return nil
 }
 
-func handleAddFeed(s *State, cmd Command) error {
+func handleAddFeed(s *State, cmd Command, user database.User) error {
 	if len(cmd.Args) != 2 {
 		return fmt.Errorf("missing arguments to addfeed")
 	}
 
-	user_res, err := s.Db.GetUserByName(context.Background(), s.Cfg.Username)
-	if err != nil {
-		return fmt.Errorf("error retrieving user from database: %w", err)
-	}
-
-	name := cmd.Args[0]
+	feedname := cmd.Args[0]
 	url := cmd.Args[1]
-	userId := user_res.ID
 
+	// Add the feed to the database
 	feed_res, err := s.Db.CreateFeed(
 		context.Background(),
 		database.CreateFeedParams{
 			ID:        uuid.New(),
 			CreatedAt: time.Now(),
 			UpdatedAt: time.Now(),
-			Name:      name,
+			Name:      feedname,
 			Url:       url,
-			UserID:    userId,
+			UserID:    user.ID,
 		})
 
 	if err != nil {
 		return fmt.Errorf("error creating new feed")
 	}
-
-	fmt.Printf("For User ID: %v\n", feed_res.UserID)
-	fmt.Printf("Feedname: %v\n", feed_res.Name)
-	fmt.Printf("URL: %v\n", feed_res.Url)
 
 	// Automatically add feed follow for logged in user.
 	follow_res, err := s.Db.CreateFeedFollow(
@@ -166,7 +157,7 @@ func handleAddFeed(s *State, cmd Command) error {
 			ID:        uuid.New(),
 			CreatedAt: time.Now(),
 			UpdatedAt: time.Now(),
-			UserID:    user_res.ID,
+			UserID:    user.ID,
 			FeedID:    feed_res.ID,
 		})
 
@@ -201,9 +192,9 @@ func handleListFeeds(s *State, cmd Command) error {
 	return nil
 }
 
-func handleFollow(s *State, cmd Command) error {
+func handleFollow(s *State, cmd Command, user database.User) error {
 	if len(cmd.Args) != 1 {
-		return fmt.Errorf("missing arguments to follow command")
+		return fmt.Errorf("missing arguments for follow command")
 	}
 
 	url := cmd.Args[0]
@@ -212,18 +203,13 @@ func handleFollow(s *State, cmd Command) error {
 		return fmt.Errorf("error getting feed by url: %w", err)
 	}
 
-	user_res, err := s.Db.GetUserByName(context.Background(), s.Cfg.Username)
-	if err != nil {
-		return fmt.Errorf("error getting user by name: %w", err)
-	}
-
 	follow_res, err := s.Db.CreateFeedFollow(
 		context.Background(),
 		database.CreateFeedFollowParams{
 			ID:        uuid.New(),
 			CreatedAt: time.Now(),
 			UpdatedAt: time.Now(),
-			UserID:    user_res.ID,
+			UserID:    user.ID,
 			FeedID:    feed_res.ID,
 		})
 
@@ -237,24 +223,41 @@ func handleFollow(s *State, cmd Command) error {
 	return nil
 }
 
-func handleFollowing(s *State, cmd Command) error {
-	fmt.Printf("Querying id for user: %v\n", s.Cfg.Username)
-	users_res, err := s.Db.GetUserByName(context.Background(), s.Cfg.Username)
-	if err != nil {
-		return fmt.Errorf("%W", err)
-	}
-
-	fmt.Printf("found id: %v\n", users_res.ID)
-	fmt.Printf("Querying feed follows:\n")
-	feed_follows, err := s.Db.GetFeedFollowsForUser(context.Background(), users_res.ID)
+func handleFollowing(s *State, cmd Command, user database.User) error {
+	feed_follows, err := s.Db.GetFeedFollowsForUser(context.Background(), user.ID)
 	if err != nil {
 		return fmt.Errorf("%w", err)
 	}
-	fmt.Printf("Found %v follows:\n", len(feed_follows))
-	fmt.Printf("User: %v\n", users_res.Name)
+
+	fmt.Printf("User: %v\n", user.Name)
 	for _, ff := range feed_follows {
 		fmt.Printf("Feed: %v\n", ff.Feedname)
 		fmt.Printf("URL: %v\n", ff.Url)
+	}
+
+	return nil
+}
+
+func handleUnfollow(s *State, cmd Command, user database.User) error {
+	if len(cmd.Args) != 1 {
+		return fmt.Errorf("missing arguments for unfollow command")
+	}
+	url := cmd.Args[0]
+
+	feed, err := s.Db.GetFeedByURL(context.Background(), url)
+	if err != nil {
+		return fmt.Errorf("%w", err)
+	}
+	fmt.Printf("deleting feed: %v", feed)
+
+	err = s.Db.DeleteFeedFollow(context.Background(),
+		database.DeleteFeedFollowParams{
+			UserID: user.ID,
+			FeedID: feed.ID,
+		})
+
+	if err != nil {
+		return fmt.Errorf("%w", err)
 	}
 
 	return nil
