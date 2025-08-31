@@ -205,7 +205,9 @@ func ScrapeFeeds(s *State) error {
 			})
 
 		if err != nil {
-			fmt.Printf("error saving post to database: %v", err)
+			// Note that the create query fails on duplicate items, so
+			// this normally gets printed a lot.
+			//fmt.Printf("error saving post to database: %v", err)
 			continue
 		}
 		fmt.Printf("Saved post: %v\n", post)
