@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/crisp-coder/gator/internal/database"
@@ -24,6 +25,7 @@ func handlerHelp(s *State, cmd Command) error {
 	fmt.Printf("follow <url> - adds the feed for the url to the users follows.\n")
 	fmt.Printf("following - lists all feeds followed by the current user.\n")
 	fmt.Printf("unfollow <url> - removes follow for url for current user.\n")
+	fmt.Printf("browse <limit> - prints up to limit posts for user feeds.\n")
 	return nil
 }
 
@@ -158,10 +160,55 @@ func ScrapeFeeds(s *State) error {
 		return fmt.Errorf("%w", err)
 	}
 
-	// Print feed contents to screen
-	rss.PrintFeed(rss_feed)
-	if err != nil {
-		return fmt.Errorf("error printing feed: %w", err)
+	layouts := []string{
+		time.RFC1123Z, // "Mon, 02 Jan 2006 15:04:05 -0700"
+		time.RFC1123,  // "Mon, 02 Jan 2006 15:04:05 MST"
+		time.RFC822Z,  // "02 Jan 06 15:04 -0700"
+		time.RFC822,   // "02 Jan 06 15:04 MST"
+		time.RFC3339,  // "2006-01-02T15:04:05Z07:00"
+	}
+
+	// Save each item in the rss feed to the posts table
+	for _, item := range rss_feed.Channel.Item {
+		// Try to parse publish date with all date layouts
+		var parse_err error
+		var published_at time.Time
+		for _, layout := range layouts {
+			t, err := time.Parse(layout, item.PubDate)
+			if err == nil {
+				published_at = t
+				parse_err = nil
+				break
+			} else {
+				parse_err = err
+			}
+
+		}
+		// Log error and continue
+		if parse_err != nil {
+			fmt.Println(fmt.Errorf("%w", parse_err))
+			fmt.Printf("error parsing publish date. skipping item %v...\n", item)
+			continue
+		}
+
+		post, err := s.Db.CreatePost(
+			context.Background(),
+			database.CreatePostParams{
+				ID:          uuid.New(),
+				CreatedAt:   time.Now(),
+				UpdatedAt:   time.Now(),
+				Title:       item.Title,
+				Url:         item.Link,
+				Description: sql.NullString{String: item.Description, Valid: true},
+				PublishedAt: published_at,
+				FeedID:      feed.ID,
+			})
+
+		if err != nil {
+			fmt.Printf("error saving post to database: %v", err)
+			continue
+		}
+		fmt.Printf("Saved post: %v\n", post)
 	}
 
 	return nil
@@ -299,6 +346,37 @@ func handleUnfollow(s *State, cmd Command, user database.User) error {
 
 	if err != nil {
 		return fmt.Errorf("%w", err)
+	}
+
+	return nil
+}
+
+func handleBrowse(s *State, cmd Command, user database.User) error {
+	limit := int64(2)
+	var err error
+	if len(cmd.Args) == 1 {
+		limit, err = strconv.ParseInt(cmd.Args[0], 10, 32)
+		if err != nil {
+			return fmt.Errorf("error parsing limit: %w", err)
+		}
+	}
+
+	posts, err := s.Db.GetPostsForUser(
+		context.Background(),
+		database.GetPostsForUserParams{
+			UserID:  user.ID,
+			Column2: limit,
+		})
+
+	if err != nil {
+		return fmt.Errorf("error retrieving posts for user: %w", err)
+	}
+
+	for _, post := range posts {
+		fmt.Printf("Title: %v\n", post.Title)
+		fmt.Printf("Link: %v\n", post.Url)
+		fmt.Printf("Description: %v\n", post.Description)
+		fmt.Printf("PubDate: %v\n", post.PublishedAt)
 	}
 
 	return nil

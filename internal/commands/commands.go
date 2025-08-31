@@ -46,6 +46,7 @@ func MakeCommands() Commands {
 	cmds.Register("follow", middlewareLoggedIn(handleFollow))
 	cmds.Register("following", middlewareLoggedIn(handleFollowing))
 	cmds.Register("unfollow", middlewareLoggedIn(handleUnfollow))
+	cmds.Register("browse", middlewareLoggedIn(handleBrowse))
 
 	return cmds
 }
