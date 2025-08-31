@@ -21,7 +21,7 @@ func handlerHelp(s *State, cmd Command) error {
 	fmt.Printf("users - lists all users.\n")
 	fmt.Printf("feeds - lists all feeds.\n")
 	fmt.Printf("addfeed <name> <url>\n")
-	fmt.Printf("agg - print rss feeds to console.")
+	fmt.Printf("agg - print rss feeds to console.\n")
 	fmt.Printf("follow <url> - adds the feed for the url to the users follows.\n")
 	fmt.Printf("following - lists all feeds followed by the current user.\n")
 	fmt.Printf("unfollow <url> - removes follow for url for current user.\n")
