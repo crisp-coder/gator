@@ -35,6 +35,7 @@ func main() {
 	args := os.Args
 	if len(args) < 2 {
 		fmt.Println("missing command name")
+		fmt.Println("try command help for more info")
 		os.Exit(1)
 	}
 	cmd_name := args[1]

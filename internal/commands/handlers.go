@@ -2,17 +2,30 @@ package commands
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
-	"html"
-	"os"
-	"os/signal"
 	"time"
 
 	"github.com/crisp-coder/gator/internal/database"
 	"github.com/crisp-coder/gator/internal/rss"
 	"github.com/google/uuid"
 )
+
+func handlerHelp(s *State, cmd Command) error {
+	fmt.Printf("help\n")
+	fmt.Printf("login <username> - logs in the user.\n")
+	fmt.Printf("register <username> - adds a user to the database and automatically logs in the user.\n")
+	fmt.Printf("reset - drops rows data but keep tables.\n")
+	fmt.Printf("users - lists all users.\n")
+	fmt.Printf("feeds - lists all feeds.\n")
+	fmt.Printf("addfeed <name> <url>\n")
+	fmt.Printf("agg - print rss feeds to console.")
+	fmt.Printf("follow <url> - adds the feed for the url to the users follows.\n")
+	fmt.Printf("following - lists all feeds followed by the current user.\n")
+	fmt.Printf("unfollow <url> - removes follow for url for current user.\n")
+	return nil
+}
 
 func handlerLogin(s *State, cmd Command) error {
 	if len(cmd.Args) == 0 {
@@ -99,30 +112,58 @@ func handleListUsers(s *State, cmd Command) error {
 }
 
 func handleAgg(s *State, cmd Command) error {
-	if len(cmd.Args) < 1 {
-		return fmt.Errorf("missing arguments to agg command")
+	if len(cmd.Args) != 1 {
+		return fmt.Errorf("missing time between requests argument to agg command")
 	}
 
-	url := cmd.Args[0]
+	timeBetweenRequests, err := time.ParseDuration(cmd.Args[0])
+	if err != nil {
+		return fmt.Errorf("error parsing time between requests: %w", err)
+	}
 
-	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
-	defer cancel()
+	ticker := time.NewTicker(timeBetweenRequests)
 
-	feed, err := rss.FetchFeed(ctx, url)
+	for ; ; <-ticker.C {
+		err := ScrapeFeeds(s)
+		if err != nil {
+			return fmt.Errorf("error in scrape feeds: %w", err)
+		}
+	}
+}
+
+func ScrapeFeeds(s *State) error {
+	// Get next feed in database
+	feed, err := s.Db.GetNextFeedToFetch(context.Background())
 	if err != nil {
 		return fmt.Errorf("%w", err)
 	}
 
-	fmt.Println(html.UnescapeString(feed.Channel.Title))
-	fmt.Println(html.UnescapeString(feed.Channel.Link))
-	fmt.Println(html.UnescapeString(feed.Channel.Description))
-	indent := "  "
-	for _, item := range feed.Channel.Item {
-		fmt.Println(indent + html.UnescapeString(item.Title))
-		fmt.Println(indent + html.UnescapeString(item.Link))
-		fmt.Println(indent + html.UnescapeString(item.Description))
-		fmt.Println(indent + html.UnescapeString(item.PubDate))
+	// Update feed time in database
+	_, err = s.Db.MarkFeedFetched(
+		context.Background(),
+		database.MarkFeedFetchedParams{
+			ID:            feed.ID,
+			LastFetchedAt: sql.NullTime{Time: time.Now(), Valid: true},
+		})
+
+	if err != nil {
+		return fmt.Errorf("%w", err)
 	}
+
+	// Get rss feed data from provider url
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	rss_feed, err := rss.FetchFeed(ctx, feed.Url)
+	if err != nil {
+		return fmt.Errorf("%w", err)
+	}
+
+	// Print feed contents to screen
+	rss.PrintFeed(rss_feed)
+	if err != nil {
+		return fmt.Errorf("error printing feed: %w", err)
+	}
+
 	return nil
 }
 

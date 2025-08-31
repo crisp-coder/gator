@@ -35,6 +35,7 @@ func MakeCommands() Commands {
 		cmd_map: make(map[string]func(*State, Command) error),
 	}
 
+	cmds.Register("help", handlerHelp)
 	cmds.Register("login", handlerLogin)
 	cmds.Register("register", handlerRegister)
 	cmds.Register("reset", handleReset)
